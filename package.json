@@ -1,0 +1,16 @@
+{
+  "name": "image_optimizer",
+  "version": "1.0.0",
+  "description": "FTP에서 다운로드한 이미지 폴더를 **한 번에 최적화하기 위한 스크립트**입니다.",
+  "main": "optimize.js",
+  "scripts": {
+    "start": "node optimize.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}

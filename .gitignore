@@ -1,0 +1,6 @@
+node_modules/
+images/
+images-optimized/
+backup_*/
+.DS_Store
+Thumbs.db
