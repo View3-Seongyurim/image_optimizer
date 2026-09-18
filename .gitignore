@@ -1,6 +1,9 @@
 node_modules/
-images/
-images-optimized/
 backup_*/
 .DS_Store
 Thumbs.db
+
+images/*
+!images/.gitkeep
+images-optimized/*
+!images-optimized/.gitkeep

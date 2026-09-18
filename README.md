@@ -22,11 +22,15 @@ images/
       └─ photo.jpg
 ```
 
-## 2. 실행
+## 2. 사용법
 
-- 대상 요소의 가로·세로 사이즈를 넣습니다.
-- 폴더는 `images` 기준 경로입니다.
-- 결과는 `images-optimized` 아래 동일한 경로로 저장됩니다.
+- 폴더명과 대상 요소의 가로·세로 사이즈를 확인하여 넣습니다.
+- `images`: 기준 경로입니다. 여기에 변환할 폴더를 그대로 넣습니다.
+- `images-optimized`: 이 경로에 변환된 폴더가 그대로 저장됩니다.
+
+```bash
+npm start -- {images 안의 폴더명} {가로값:세로값}
+```
 
 ```bash
 npm start -- notice_01 300:300
@@ -34,11 +38,11 @@ npm start -- banners 1920:600
 ```
 
 ```text
-images/notice_01/2026_02_13/photo.jpg
-  → images-optimized/notice_01/2026_02_13/photo.jpg
+기존: images/notice_01/2026_02_13/photo.jpg
+변환: images-optimized/notice_01/2026_02_13/photo.jpg
 ```
 
-- 폴더 구조, 파일명, 확장자는 바뀌지 않습니다. FTP에 올릴 때 기존 경로를 그대로 쓰면 됩니다.
+- 폴더 구조, 파일명, 확장자는 바뀌지 않습니다. FTP에 올릴 때 기존 경로를 그대로 덮어쓰면 됩니다.
 - 같은 폴더를 다시 실행하면 **해당 결과 폴더를 지우고, 원본 기준으로 다시** 만듭니다.
 - 이미 줄어든 파일을 재압축하지는 않습니다.
 
