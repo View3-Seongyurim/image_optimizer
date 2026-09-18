@@ -30,23 +30,27 @@ let outputDir = '';
 function formatSize(bytes) {
   if (bytes === 0) return '0 B';
 
+  const abs = Math.abs(bytes);
   const units = ['B', 'KB', 'MB', 'GB'];
-  const index = Math.floor(Math.log(bytes) / Math.log(1024));
+  const index = Math.min(
+    Math.floor(Math.log(abs) / Math.log(1024)),
+    units.length - 1
+  );
 
-  return `${(bytes / Math.pow(1024, index)).toFixed(2)} ${units[index]}`;
+  return `${(abs / Math.pow(1024, index)).toFixed(2)} ${units[index]}`;
 }
 
 function printUsage() {
   console.error('');
   console.error('사용법:');
   console.error('  npm start -- <폴더> <가로:세로>');
-  console.error('  npm start -- <폴더> <가로>          (정사각)');
   console.error('');
   console.error('예시:');
-  console.error('  npm start -- thumbs 300:300');
-  console.error('  npm start -- thumbs 300');
+  console.error('  npm start -- notice_01 300:300');
   console.error('  npm start -- banners 1920:600');
   console.error('');
+  console.error('요소의 가로·세로를 모두 채울 수 있는 크기로,');
+  console.error('비율을 유지한 채 한 번에 줄입니다.');
   console.error('폴더는 images 아래 경로입니다.');
   console.error('결과는 images-optimized 아래 같은 폴더에 저장됩니다.');
   console.error('');
@@ -54,7 +58,6 @@ function printUsage() {
 
 /**
  * 300:300 → { width: 300, height: 300 }
- * 300     → { width: 300, height: 300 }
  */
 function parseSize(sizeArg) {
   if (!sizeArg) {
@@ -63,39 +66,26 @@ function parseSize(sizeArg) {
 
   const parts = sizeArg.split(':').map(part => part.trim());
 
-  if (parts.length === 1 || (parts.length === 2 && parts[1] === '')) {
-    const width = Number(parts[0]);
-
-    if (!Number.isInteger(width) || width <= 0) {
-      return null;
-    }
-
-    return {
-      width,
-      height: width,
-    };
+  if (parts.length !== 2) {
+    return null;
   }
 
-  if (parts.length === 2) {
-    const width = Number(parts[0]);
-    const height = Number(parts[1]);
+  const width = Number(parts[0]);
+  const height = Number(parts[1]);
 
-    if (
-      !Number.isInteger(width) ||
-      !Number.isInteger(height) ||
-      width <= 0 ||
-      height <= 0
-    ) {
-      return null;
-    }
-
-    return {
-      width,
-      height,
-    };
+  if (
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width <= 0 ||
+    height <= 0
+  ) {
+    return null;
   }
 
-  return null;
+  return {
+    width,
+    height,
+  };
 }
 
 function parseArgs() {
@@ -112,6 +102,7 @@ function parseArgs() {
   if (!size) {
     console.error('');
     console.error(`이미지 크기를 확인할 수 없습니다: ${sizeArg}`);
+    console.error('요소의 가로와 세로를 모두 넣어야 합니다. 예: 300:300');
     printUsage();
     process.exit(1);
   }
@@ -167,13 +158,10 @@ function getFiles(dir) {
 /**
  * 이미지 한 개를 최적화한다.
  *
- * 지정한 크기로 맞출 때는 CSS object-fit: cover와 같이
- * 비율을 유지한 채 전체를 축소한 다음, 넘치는 부분만
- * 가운데를 기준으로 자른다.
- *
- * 원본의 왼쪽 위를 그대로 300×300으로 잘라내지 않는다.
+ * 대상 요소의 가로·세로를 모두 채울 수 있는 크기로,
+ * 원본 이미지의 비율을 유지한 채 줄인다.
  */
-async function optimizeImage(inputPath, outputPath, maxWidth, maxHeight) {
+async function optimizeImage(inputPath, outputPath, targetWidth, targetHeight) {
   const ext = path.extname(inputPath).toLowerCase();
   const originalSize = fs.statSync(inputPath).size;
   const relativePath = path.relative(inputDir, inputPath);
@@ -206,21 +194,22 @@ async function optimizeImage(inputPath, outputPath, maxWidth, maxHeight) {
     let image = sharp(inputPath).rotate();
 
     /**
-     * fit: 'cover' + position: 'centre'
+     * fit: 'outside'
      *
-     * 1) 짧은 변이 목표 크기에 닿을 때까지 전체를 축소
-     * 2) 비율이 달라도 이미지를 늘리거나 찌그러뜨리지 않음
-     * 3) 넘치는 영역은 가운데 기준으로 크롭
+     * 요소 가로·세로를 모두 채울 수 있는 크기로 한 번에 축소한다.
+     * 한쪽은 요소와 같고, 다른 쪽은 비율대로 더 길다. 자르지 않는다.
      *
-     * 예)
-     * 2500 × 2500 → 300 × 300
-     * 2500 × 1500 → 500 × 300으로 축소 후 가운데 300 × 300 크롭
+     * 예) 요소 300 × 300
+     * 2500 × 1500 → 500 × 300
+     * 1856 × 2304 → 300 × 372
+     *
+     * 예) 요소 1920 × 600
+     * 4000 × 2000 → 1920 × 960
      */
     image = image.resize({
-      width: maxWidth,
-      height: maxHeight,
-      fit: 'cover',
-      position: 'centre',
+      width: targetWidth,
+      height: targetHeight,
+      fit: 'outside',
       withoutEnlargement: true,
     });
 
@@ -259,26 +248,37 @@ async function optimizeImage(inputPath, outputPath, maxWidth, maxHeight) {
 
     const optimizedSize = fs.statSync(tempPath).size;
 
-    fs.renameSync(tempPath, outputPath);
+    /**
+     * 다시 저장한 결과가 원본보다 크거나 같으면
+     * 용량을 늘리지 않기 위해 원본을 유지한다.
+     */
+    if (optimizedSize >= originalSize) {
+      fs.unlinkSync(tempPath);
+      fs.copyFileSync(inputPath, outputPath);
 
-    totalOptimizedSize += optimizedSize;
-    processedCount++;
+      totalOptimizedSize += originalSize;
+      copiedCount++;
 
-    const reduction =
-      originalSize > 0
-        ? ((originalSize - optimizedSize) / originalSize) * 100
-        : 0;
-    const reductionLabel =
-      reduction >= 0
-        ? `-${reduction.toFixed(1)}%`
-        : `+${Math.abs(reduction).toFixed(1)}%`;
+      console.log(`[KEEP] ${relativePath}`);
+      console.log(
+        `       용량이 줄지 않음 → 원본 유지 (${formatSize(originalSize)})`
+      );
+    } else {
+      fs.renameSync(tempPath, outputPath);
 
-    console.log(`[OK] ${relativePath}`);
-    console.log(
-      `     ${formatSize(originalSize)} → ${formatSize(
-        optimizedSize
-      )} (${reductionLabel})`
-    );
+      totalOptimizedSize += optimizedSize;
+      processedCount++;
+
+      const reduction =
+        ((originalSize - optimizedSize) / originalSize) * 100;
+
+      console.log(`[OK] ${relativePath}`);
+      console.log(
+        `     ${formatSize(originalSize)} → ${formatSize(
+          optimizedSize
+        )} (-${reduction.toFixed(1)}%)`
+      );
+    }
   } catch (error) {
     failedCount++;
     failedFiles.push(inputPath);
@@ -356,7 +356,8 @@ async function main() {
   console.log('========================================');
   console.log('');
   console.log(`대상 폴더 : ${inputDir}`);
-  console.log(`목표 크기 : ${width} × ${height} (cover / 가운데)`);
+  console.log(`대상 요소 : ${width} × ${height}`);
+  console.log('작업 내용 : 요소를 채울 크기로 축소, 비율 유지, 크롭 없음');
   console.log(`JPG 품질 : ${JPEG_QUALITY}`);
   console.log(`WebP 품질 : ${WEBP_QUALITY}`);
   console.log('');
@@ -399,7 +400,11 @@ async function main() {
   console.log('');
   console.log(`원본 총 용량   : ${formatSize(totalOriginalSize)}`);
   console.log(`최적화 후      : ${formatSize(totalOptimizedSize)}`);
-  console.log(`절감 용량      : ${formatSize(savedSize)}`);
+  console.log(
+    savedSize >= 0
+      ? `절감 용량      : ${formatSize(savedSize)}`
+      : `증가 용량      : ${formatSize(savedSize)}`
+  );
   console.log(`절감률         : ${reductionRate.toFixed(1)}%`);
 
   /**
